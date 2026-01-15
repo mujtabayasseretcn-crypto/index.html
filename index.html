@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">VENORA POS ULTIMATE</title>
+    <style>
+        :root { --dark: #0f172a; --primary: #2563eb; --danger: #ef4444; --success: #10b981; --warning: #f59e0b; }
+        body { margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f1f5f9; color: #334155; }
+        header { background: var(--dark); color: #fff; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000; }
+        .container { max-width: 1200px; margin: auto; padding: 15px; }
+        .page { display: none; }
+        .active { display: block; }
+        .card { background: #fff; padding: 20px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        
+        /* تصميم الأزرار والتبويبات */
+        .tabs { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px; }
+        .tabs button { flex: 1; background: #e2e8f0; color: #475569; border: none; padding: 12px; border-radius: 8px; cursor: pointer; white-space: nowrap; font-weight: bold; transition: 0.3s; }
+        .tabs button.active-tab { background: var(--primary); color: white; }
+        
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 15px; }
+        button { background: var(--dark); color: white; border: none; cursor: pointer; }
+        button:hover { opacity: 0.9; }
+
+        .grid-main { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .grid-main { grid-template-columns: 1fr; } }
+
+        .item-card { background: white; border: 1px solid #e2e8f0; padding: 15px; border-radius: 10px; text-align: center; cursor: pointer; transition: 0.2s; }
+        .item-card:hover { border-color: var(--primary); transform: translateY(-3px); }
+        .stock-low { border: 2px solid var(--danger) !important; background: #fef2f2; }
+
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 12px; border: 1px solid #f1f5f9; text-align: center; }
+        th { background: #f8fafc; color: var(--dark); }
+
+        .badge { padding: 4px 8px; border-radius: 6px; font-size: 11px; color: white; font-weight: bold; }
+        .bg-success { background: var(--success); }
+        .bg-danger { background: var(--danger); }
+        .bg-warning { background: var(--warning); }
+
+        /* منطقة الوصل */
+        #receipt-area { display: none; width: 300px; padding: 20px; font-family: monospace; }
+        @media print { body * { visibility: hidden; } #receipt-area, #receipt-area * { visibility: visible; } #receipt-area { position: absolute; left: 0; top: 0; display: block; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div style="display:flex; align-items:center; gap:10px;">
+        <img id="headerLogo" src="" width="35" style="border-radius:50%; display:none;">
+        <span id="headerStoreName">VENORA POS</span>
+    </div>
+    <div id="userTag" style="font-size:14px; opacity:0.8;"></div>
+</header>
+
+<div class="container">
+    <div id="loginPage" class="page active">
+        <div class="card" style="max-width:400px; margin: 80px auto; text-align:center;">
+            <img id="loginLogo" src="https://cdn-icons-png.flaticon.com/512/3081/3081559.png" width="80" style="margin-bottom:10px;">
+            <h2 id="loginTitle">تسجيل الدخول</h2>
+            <input id="uInp" placeholder="اسم المستخدم">
+            <input id="pInp" type="password" placeholder="كلمة المرور">
+            <button onclick="login()">دخول للنظام</button>
+        </div>
+    </div>
+
+    <div id="mainPage" class="page">
+        <div class="tabs" id="mainNav">
+            <button onclick="nav('pos')" id="btn-pos">واجهة البيع</button>
+            <button onclick="nav('stock')" id="btn-stock">المخزن</button>
+            <button onclick="nav('reports')" id="btn-reports">الحسابات</button>
+            <button onclick="nav('settings')" id="btn-settings">الإعدادات والتطوير</button>
+        </div>
+
+        <div id="sec-pos" class="section">
+            <div class="grid-main">
+                <div class="card">
+                    <div class="tabs" id="categoryTabs"></div>
+                    <div id="shopGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap:12px;"></div>
+                </div>
+                <div class="card">
+                    <h3>سلة المبيعات</h3>
+                    <div id="cartList" style="min-height:200px; border-bottom:1px solid #eee;"></div>
+                    <input id="custName" placeholder="اسم الزبون">
+                    <input id="saleDisc" type="number" placeholder="خصم مبلغ" oninput="updateTotal()">
+                    <select id="payType"><option value="cash">نقدي</option><option value="debt">آجل (دين)</option></select>
+                    <h2 style="color:var(--primary)">الإجمالي: <span id="finalTotal">0</span> د.ع</h2>
+                    <button onclick="completeSale()" class="bg-success" style="padding:15px; font-size:18px;">إتمام وطباعة الوصل</button>
+                </div>
+            </div>
+        </div>
+
+        <div id="sec-stock" class="section" style="display:none">
+            <div class="card">
+                <h3>إضافة منتج جديد</h3>
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                    <input id="prodN" placeholder="اسم المنتج">
+                    <select id="prodC"></select>
+                    <input id="prodB" type="number" placeholder="سعر الشراء">
+                    <input id="prodS" type="number" placeholder="سعر البيع">
+                    <input id="prodQ" type="number" placeholder="الكمية">
+                    <button onclick="addProduct()" class="bg-success">حفظ المنتج</button>
+                </div>
+            </div>
+            <div id="stockTableArea"></div>
+        </div>
+
+        <div id="sec-reports" class="section" style="display:none">
+            <div class="grid-main" style="grid-template-columns: 1fr 1fr 1fr;">
+                <div class="card" style="border-top:4px solid var(--success)">إجمالي المبيعات<h2 id="repSales">0</h2></div>
+                <div class="card" style="border-top:4px solid var(--danger)">المصاريف<h2 id="repExp">0</h2></div>
+                <div class="card" style="border-top:4px solid var(--primary)">صافي الربح<h2 id="repProfit">0</h2></div>
+            </div>
+            <div class="card">
+                <h3>آخر العمليات</h3>
+                <table id="salesTable">
+                    <thead><tr><th>التاريخ</th><th>الموظف</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div id="sec-settings" class="section" style="display:none">
+            <div class="grid-main">
+                <div class="card">
+                    <h3>إعدادات المتجر</h3>
+                    <input id="setStoreName" placeholder="اسم المتجر">
+                    <input id="setLogoUrl" placeholder="رابط صورة الشعار (URL)">
+                    <input id="setCats" placeholder="الأقسام (افصل بينها بفاصلة)">
+                    <button onclick="saveSettings()">حفظ التغييرات</button>
+                </div>
+                <div class="card">
+                    <h3>النسخ الاحتياطي وتحديث الكود</h3>
+                    <button onclick="exportData()" style="background:var(--warning)">تصدير نسخة احتياطية للبيانات</button>
+                    <hr>
+                    <p style="font-size:12px;">لرفع بيانات قديمة، اختر الملف:</p>
+                    <input type="file" id="importFile" onchange="importData()">
+                </div>
+            </div>
+        </div>
+        <button onclick="location.reload()" class="bg-danger" style="width:auto; padding:10px 20px;">تسجيل خروج</button>
+    </div>
+</div>
+
+<div id="receipt-area"></div>
+
+<script>
+    // تهيئة البيانات الأساسية
+    let db = JSON.parse(localStorage.getItem('venora_db')) || {
+        users: [{u:'admin', p:'1234', r:'admin'}],
+        stock: [],
+        sales: [],
+        expenses: [],
+        settings: { name: 'VENORA STORE', logo: '', cats: 'كوزمتك,ليزر' }
+    };
+
+    let currentU = null;
+    let cart = [];
+
+    // نظام الدخول
+    function login() {
+        const u = document.getElementById('uInp').value;
+        const p = document.getElementById('pInp').value;
+        const user = db.users.find(x => x.u === u && x.p === p);
+        if(!user) return alert('خطأ في البيانات');
+        currentU = user;
+        document.getElementById('loginPage').classList.remove('active');
+        document.getElementById('mainPage').classList.add('active');
+        document.getElementById('userTag').innerText = `المستخدم: ${user.u}`;
+        
+        // إخفاء التبويبات حسب الصلاحية
+        if(user.r !== 'admin') {
+            document.getElementById('btn-stock').style.display = 'none';
+            document.getElementById('btn-reports').style.display = 'none';
+            document.getElementById('btn-settings').style.display = 'none';
+        }
+        
+        applySettings();
+        nav('pos');
+    }
+
+    function nav(t) {
+        document.querySelectorAll('.section').forEach(s => s.style.display = 'none');
+        document.getElementById('sec-' + t).style.display = 'block';
+        document.querySelectorAll('#mainNav button').forEach(b => b.classList.remove('active-tab'));
+        document.getElementById('btn-' + t).classList.add('active-tab');
+        if(t === 'pos') loadCategories();
+        if(t === 'stock') renderStock();
+        if(t === 'reports') renderReports();
+    }
+
+    // الإعدادات
+    function applySettings() {
+        document.getElementById('headerStoreName').innerText = db.settings.name;
+        document.title = db.settings.name;
+        if(db.settings.logo) {
+            document.getElementById('headerLogo').src = db.settings.logo;
+            document.getElementById('headerLogo').style.display = 'inline';
+        }
+        document.getElementById('setStoreName').value = db.settings.name;
+        document.getElementById('setLogoUrl').value = db.settings.logo;
+        document.getElementById('setCats').value = db.settings.cats;
+    }
+
+    function saveSettings() {
+        db.settings.name = document.getElementById('setStoreName').value;
+        db.settings.logo = document.getElementById('setLogoUrl').value;
+        db.settings.cats = document.getElementById('setCats').value;
+        save();
+        alert('تم حفظ الإعدادات');
+        location.reload();
+    }
+
+    function loadCategories() {
+        const catArea = document.getElementById('categoryTabs');
+        const cats = db.settings.cats.split(',');
+        catArea.innerHTML = cats.map(c => `<button onclick="renderShop('${c.trim()}')">${c.trim()}</button>`).join('');
+        renderShop(cats[0]);
+        
+        const sel = document.getElementById('prodC');
+        sel.innerHTML = cats.map(c => `<option value="${c.trim()}">${c.trim()}</option>`).join('');
+    }
+
+    // المخزن والبيع
+    function renderShop(cat) {
+        const filtered = db.stock.filter(x => x.c === cat && x.q > 0);
+        document.getElementById('shopGrid').innerHTML = filtered.map(x => `
+            <div class="item-card ${x.q < 5 ? 'stock-low' : ''}" onclick="addToCart(${x.id})">
+                <small>${x.c}</small>
+                <div style="font-weight:bold">${x.n}</div>
+                <div style="color:var(--primary)">${x.s} د.ع</div>
+                <span class="badge ${x.q < 5 ? 'bg-danger' : 'bg-success'}">متوفر: ${x.q}</span>
+            </div>
+        `).join('') || 'لا توجد منتجات';
+    }
+
+    function addToCart(id) {
+        const item = db.stock.find(x => x.id === id);
+        const inCart = cart.find(x => x.id === id);
+        if(inCart) {
+            if(inCart.qty < item.q) inCart.qty++;
+            else alert('تجاوزت الكمية المتوفرة');
+        } else { cart.push({...item, qty: 1}); }
+        updateTotal();
+    }
+
+    function updateTotal() {
+        let t = 0;
+        document.getElementById('cartList').innerHTML = cart.map(x => {
+            t += (x.s * x.qty);
+            return `<div style="display:flex; justify-content:space-between; padding:8px; border-bottom:1px solid #f9f9f9">
+                <span>${x.n} x${x.qty}</span>
+                <span>${x.s * x.qty} د.ع</span>
+            </div>`;
+        }).join('');
+        const disc = parseFloat(document.getElementById('saleDisc').value) || 0;
+        document.getElementById('finalTotal').innerText = t - disc;
+    }
+
+    function completeSale() {
+        if(!cart.length) return alert('السلة فارغة');
+        const disc = parseFloat(document.getElementById('saleDisc').value) || 0;
+        let sub = 0; let cost = 0;
+        cart.forEach(x => { sub += (x.s * x.qty); cost += (x.b * x.qty); });
+        
+        const sale = {
+            id: Date.now(),
+            date: new Date().toLocaleString(),
+            items: [...cart],
+            total: sub - disc,
+            profit: (sub - disc) - cost,
+            by: currentU.u,
+            type: document.getElementById('payType').value,
+            cust: document.getElementById('custName').value || 'زبون عام'
+        };
+
+        db.sales.push(sale);
+        cart.forEach(c => db.stock.find(s => s.id === c.id).q -= c.qty);
+        save();
+
+        // إنشاء الوصل
+        let receiptHtml = `<center><h2>${db.settings.name}</h2><p>${sale.date}</p></center><hr>`;
+        receiptHtml += cart.map(x => `<div style="display:flex; justify-content:space-between"><span>${x.n} x${x.qty}</span><span>${x.s * x.qty}</span></div>`).join('');
+        receiptHtml += `<hr><div style="text-align:left">مجموع: ${sub}<br>خصم: ${disc}<br><b>الإجمالي: ${sale.total} د.ع</b></div>`;
+        receiptHtml += `<center><p>البائع: ${sale.by}</p></center>`;
+        
+        document.getElementById('receipt-area').innerHTML = receiptHtml;
+        window.print();
+        
+        cart = []; updateTotal(); renderShop(db.settings.cats.split(',')[0]);
+        alert('تمت العملية بنجاح');
+    }
+
+    function addProduct() {
+        const n = document.getElementById('prodN').value;
+        const b = parseFloat(document.getElementById('prodB').value) || 0;
+        const s = parseFloat(document.getElementById('prodS').value) || 0;
+        const q = parseInt(document.getElementById('prodQ').value) || 0;
+        const c = document.getElementById('prodC').value;
+        if(!n || !s) return alert('أدخل الاسم والسعر');
+        db.stock.push({id: Date.now(), n, b, s, q, c});
+        save(); renderStock(); alert('تم الإضافة');
+    }
+
+    function renderStock() {
+        document.getElementById('stockTableArea').innerHTML = `
+            <table>
+                <thead><tr><th>المنتج</th><th>القسم</th><th>الشراء</th><th>البيع</th><th>الكمية</th><th>حذف</th></tr></thead>
+                <tbody>${db.stock.map(x => `
+                    <tr class="${x.q < 5 ? 'stock-low' : ''}">
+                        <td>${x.n}</td><td>${x.c}</td><td>${x.b}</td><td>${x.s}</td><td>${x.q}</td>
+                        <td><button onclick="delStock(${x.id})" class="bg-danger" style="width:auto; padding:5px 10px;">حذف</button></td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>`;
+    }
+
+    function delStock(id) { db.stock = db.stock.filter(x => x.id !== id); save(); renderStock(); }
+
+    function renderReports() {
+        let ts = 0, tp = 0;
+        db.sales.forEach(s => { ts += s.total; tp += s.profit; });
+        document.getElementById('repSales').innerText = ts + " د.ع";
+        document.getElementById('repProfit').innerText = tp + " د.ع";
+        
+        document.getElementById('salesTable').querySelector('tbody').innerHTML = db.sales.slice(-15).reverse().map(s => `
+            <tr><td>${s.date}</td><td>${s.by}</td><td>${s.total}</td><td><span class="badge ${s.type==='cash'?'bg-success':'bg-warning'}">${s.type}</span></td></tr>
+        `).join('');
+    }
+
+    function exportData() {
+        const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+        const downloadAnchorNode = document.createElement('a');
+        downloadAnchorNode.setAttribute("href", dataStr);
+        downloadAnchorNode.setAttribute("download", "venora_backup_" + new Date().toLocaleDateString() + ".json");
+        document.body.appendChild(downloadAnchorNode);
+        downloadAnchorNode.click();
+        downloadAnchorNode.remove();
+    }
+
+    function importData() {
+        const file = document.getElementById('importFile').files[0];
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            db = JSON.parse(e.target.result);
+            save();
+            alert('تم استعادة البيانات بنجاح!');
+            location.reload();
+        };
+        reader.readAsText(file);
+    }
+
+    function save() { localStorage.setItem('venora_db', JSON.stringify(db)); }
+</script>
+</body>
+</html>
